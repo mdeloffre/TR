@@ -66,6 +66,7 @@ private:
     ComRobot robot;
     int robotStarted = 0;
     int withWatchDog = 0;
+    int comRobot_err = 0;
     int move = MESSAGE_ROBOT_STOP;
     
     /**********************************************************************/
@@ -75,10 +76,13 @@ private:
     RT_TASK th_sendToMon;
     RT_TASK th_receiveFromMon;
     RT_TASK th_openComRobot;
+    RT_TASK th_closeComRobot;
     RT_TASK th_startRobot;
     RT_TASK th_move;
     RT_TASK th_battery;
     RT_TASK th_wdReset;
+    RT_TASK th_checkrobot;
+    RT_TASK th_restartserver;
     
     /**********************************************************************/
     /* Mutex                                                              */
@@ -88,14 +92,17 @@ private:
     RT_MUTEX mutex_robotStarted;
     RT_MUTEX mutex_move;
     RT_MUTEX mutex_watchdog;
+    RT_MUTEX mutex_comRobot_err;
 
     /**********************************************************************/
     /* Semaphores                                                         */
     /**********************************************************************/
     RT_SEM sem_barrier;
     RT_SEM sem_openComRobot;
+    RT_SEM sem_closeComRobot;
     RT_SEM sem_serverOk;
     RT_SEM sem_startRobot;
+    RT_SEM sem_restartserver;
 
     /**********************************************************************/
     /* Message queues                                                     */
@@ -112,6 +119,11 @@ private:
     void ServerTask(void *arg);
      
     /**
+    * @brief Thread handling the server restart.
+    */
+    void RestartServerTask(void *arg);
+   
+    /**
      * @brief Thread sending data to monitor.
      */
     void SendToMonTask(void *arg);
@@ -126,6 +138,11 @@ private:
      */
     void OpenComRobot(void *arg);
 
+    /**
+    * @brief Thread closing communication with the robot.
+    */
+   void CloseComRobot(void *arg);
+   
     /**
      * @brief Thread starting the communication with the robot.
      */
@@ -145,6 +162,11 @@ private:
     * @brief Thread handling the watchdog reset
     */
     void WatchDogResetTask(void *arg);
+    
+    /**
+     * @brief Thread handling the communication with the robot.
+     */
+    void CheckComRobot(void *arg);
     
     /**********************************************************************/
     /* Queue services                                                     */
