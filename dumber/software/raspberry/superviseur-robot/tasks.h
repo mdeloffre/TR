@@ -103,6 +103,7 @@ private:
     RT_SEM sem_serverOk;
     RT_SEM sem_startRobot;
     RT_SEM sem_restartserver;
+    RT_SEM sem_wdRestart;
 
     /**********************************************************************/
     /* Message queues                                                     */

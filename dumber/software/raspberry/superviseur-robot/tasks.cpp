@@ -112,6 +112,10 @@ void Tasks::Init() {
         cerr << "Error semaphore create: " << strerror(-err) << endl << flush;
         exit(EXIT_FAILURE);
     }
+    if (err = rt_sem_create(&sem_wdRestart, NULL, 0, S_FIFO)) {
+        cerr << "Error semaphore create: " << strerror(-err) << endl << flush;
+        exit(EXIT_FAILURE);
+    }
     cout << "Semaphores created successfully" << endl << flush;
 
     /**************************************************************************************/
@@ -290,8 +294,7 @@ void Tasks::RestartServerTask(void *arg) {
         
         WriteInQueue(&q_messageToMon, new Message(MESSAGE_ANSWER_COM_ERROR));
         
-        //fermeture de la communication 
-        rt_sem_v(&sem_closeComRobot);
+        
         
         
         /*fermeture du monitor pour permettre la réouverture de la com
@@ -363,7 +366,9 @@ void Tasks::ReceiveFromMonTask(void *arg) {
         } else if (msgRcv->CompareID(MESSAGE_ROBOT_START_WITH_WD)) {
             rt_mutex_acquire(&mutex_watchdog, TM_INFINITE);
             withWatchDog = 1;
+            cout << "BRANCHE AVEC WATCHDOG = " << withWatchDog << endl << flush;
             rt_mutex_release(&mutex_watchdog);
+            
             
             rt_mutex_acquire(&mutex_comRobot_err, TM_INFINITE);
             com_err = comRobot_err;
@@ -501,11 +506,11 @@ void Tasks::StartRobotTask(void *arg) {
     /* The task startRobot starts here                                                    */
     /**************************************************************************************/
     while (1) {
+        rt_sem_p(&sem_startRobot, TM_INFINITE);
+        
         rt_mutex_acquire(&mutex_watchdog, TM_INFINITE);
         wd = withWatchDog;
         rt_mutex_release(&mutex_watchdog);
-        
-        rt_sem_p(&sem_startRobot, TM_INFINITE);
         if (wd == 1){
             cout << "Start robot with watchdog (";
             rt_mutex_acquire(&mutex_robot, TM_INFINITE);
@@ -529,6 +534,7 @@ void Tasks::StartRobotTask(void *arg) {
             robotStarted = 1;
             rt_mutex_release(&mutex_robotStarted);
         }
+        rt_sem_v(&sem_wdRestart);
     }
 }
 
@@ -583,7 +589,7 @@ void Tasks::BatteryTask(void *arg) {
     /**************************************************************************************/
     /* The task starts here                                                               */
     /**************************************************************************************/
-    rt_task_set_periodic(NULL, TM_NOW, 500000000);
+    rt_task_set_periodic(NULL, TM_NOW, 100000000);
     
     while(1) {
         rt_task_wait_period(NULL);
@@ -598,7 +604,9 @@ void Tasks::BatteryTask(void *arg) {
             batteryLevel = robot.Write(new Message(MESSAGE_ROBOT_BATTERY_GET));
             rt_mutex_release(&mutex_robot);
             cout << "Battery level:" << batteryLevel->ToString() << endl << flush;
-            WriteInQueue(&q_messageToMon, batteryLevel);
+            if (batteryLevel->CompareID(MESSAGE_ROBOT_BATTERY_LEVEL)){
+                WriteInQueue(&q_messageToMon, batteryLevel);
+            }
         }
     }
 }
@@ -610,10 +618,15 @@ void Tasks::WatchDogResetTask(void *args) {
     int wd, rs;
     Message* answer;
     
+    rt_sem_p(&sem_barrier, TM_INFINITE);
+    
     /**************************************************************************************/
     /* The task starts here                                                               */
     /**************************************************************************************/
+    
+    rt_sem_p(&sem_wdRestart, TM_INFINITE);
     rt_task_set_periodic(NULL, TM_NOW, 1000000000);
+    
     while(1){
         rt_task_wait_period(NULL);
         
@@ -626,7 +639,9 @@ void Tasks::WatchDogResetTask(void *args) {
         rt_mutex_release(&mutex_watchdog);
         
         if (rs == 1 && wd == 1) {
+            rt_mutex_acquire(&mutex_robot, TM_INFINITE);
             answer = robot.Write(robot.ReloadWD());
+            rt_mutex_release(&mutex_robot);
             cout << "Watchdog RESET : " << answer->ToString() << endl << flush;
         }
     }
@@ -680,8 +695,10 @@ void Tasks::CheckComRobot(void *arg) {
                 robotStarted = 0;
                 rt_mutex_release(&mutex_robotStarted);
                 
-                rt_sem_v(&sem_restartserver);
-                //WriteInQueue(&q_messageToMon, new Message(MESSAGE_ANSWER_COM_ERROR));                    
+                //rt_sem_v(&sem_restartserver);
+                //fermeture de la communication 
+                rt_sem_v(&sem_closeComRobot);
+                WriteInQueue(&q_messageToMon, new Message(MESSAGE_ANSWER_COM_ERROR));                    
             }
             else if (status->CompareID(MESSAGE_ANSWER_COM_ERROR)) {
                error_cnt++;
