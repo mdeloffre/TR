@@ -64,6 +64,7 @@ private:
     /**********************************************************************/
     ComMonitor monitor;
     ComRobot robot;
+    Camera camera;
     int robotStarted = 0;
     int withWatchDog = 0;
     int comRobot_err = 0;
@@ -83,27 +84,31 @@ private:
     RT_TASK th_wdReset;
     RT_TASK th_checkrobot;
     RT_TASK th_restartserver;
+    RT_TASK th_closeCamera;
     
     /**********************************************************************/
     /* Mutex                                                              */
     /**********************************************************************/
     RT_MUTEX mutex_monitor;
     RT_MUTEX mutex_robot;
+    RT_MUTEX mutex_camera;
     RT_MUTEX mutex_robotStarted;
     RT_MUTEX mutex_move;
     RT_MUTEX mutex_watchdog;
     RT_MUTEX mutex_comRobot_err;
-
+    
     /**********************************************************************/
     /* Semaphores                                                         */
     /**********************************************************************/
     RT_SEM sem_barrier;
     RT_SEM sem_openComRobot;
     RT_SEM sem_closeComRobot;
+    RT_SEM sem_closeCamera;
     RT_SEM sem_serverOk;
     RT_SEM sem_startRobot;
     RT_SEM sem_restartserver;
     RT_SEM sem_wdRestart;
+    RT_SEM sem_startserver;
 
     /**********************************************************************/
     /* Message queues                                                     */
@@ -143,6 +148,11 @@ private:
     * @brief Thread closing communication with the robot.
     */
    void CloseComRobot(void *arg);
+   
+    /**
+    * @brief Thread closing communication with the camera.
+    */
+   void CloseCamera(void *arg);
    
     /**
      * @brief Thread starting the communication with the robot.
